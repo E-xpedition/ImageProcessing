@@ -33,13 +33,11 @@ This script returns quadrants of images, useful as close-ups.
     
 """
 from PIL import Image
- 
-# Opens a image in RGB mode
+
 number      = 2256 # Directory where input image(s) is located
 number2     = 1903 # If only 1 image, same as number. If attempting multiple images of ascending image number, final image number
 directory   = "F:\\Pokemon\\Processing\\" # Directory where input image(s) is located
 out_dir     = "F:\\Pokemon\\Processing\\" # Directory where the result is saved to
-
 
 for picture in range(number,number2+1):
     try:
