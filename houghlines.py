@@ -1,0 +1,209 @@
+"""
+                                                            
+                             . ......                       
+                           ..........:.                     
+                 ...... ...............:........            
+                :.............................:::.          
+           .:===.....::::.....:::::.......::-::::-          
+     .::  :*+****+::------------------::::::---:-:          
+    +***#=%**#*#** .::-:::.::------------------:-:          
+    -#*******###%-          .:::::--:--:...:-:.             
+   .:+*++********#+        : +#--=#* .                      
+   +******++:+**##*+        -::.:*#=#.                      
+     +***+=#@+*%:%**=      =:--::+#+=+                      
+     :++***#**#:=+**#- ::-*-:==--*#=--=-:.                  
+      :*****#+=*=:-**%=+.-..-+::--#-:+++++                  
+        =*+--:  +:::***..:-:+=-==+-:::-:-#                  
+                =:::=***--..:----==+=+====*:                
+                +::::***+.--:-::::===*+====+.               
+                +::::+***%**--=-::-==++=+=++#               
+               @::::::****####+-=+*+*+*####*+*              
+               %:...::=***##**##+=-=*#*##**##%=-            
+               #.......-**********##************#==-        
+          :-=+**-.......-**************####+***+++**-       
+       .:++++****.........-+*******+===+*****===:-.         
+       ++++++=+-=-=-:::::::::-=+-===++*******#=:.           
+         ----.      -:=-----=:-   --==++=++++##==           
+                                        ----:               
+
+This module contains all the functions required for Straight_Crop_Cardpics.py
+"""
+
+import numpy as np
+import cv2
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+
+def polar2cartesian(rho: float, theta_rad: float, rotate90: bool = False):
+    """
+    Converts line equation from polar to cartesian coordinates
+
+    Args:
+        rho: input line rho
+        theta_rad: input line theta
+        rotate90: output line perpendicular to the input line
+
+    Returns:
+        m: slope of the line
+           For horizontal line: m = 0
+           For vertical line: m = np.nan
+        b: intercept when x=0
+    """
+    x = np.cos(theta_rad) * rho
+    y = np.sin(theta_rad) * rho
+    m = np.nan
+    if not np.isclose(x, 0.0):
+        m = y / x
+    if rotate90:
+        if m is np.nan:
+            m = 0.0
+        elif np.isclose(m, 0.0):
+            m = np.nan
+        else:
+            m = -1.0 / m
+    b = 0.0
+    if m is not np.nan:
+        b = y - m * x
+
+    return m, b
+
+
+def solve4x(y: float, m: float, b: float):
+    """
+    From y = m * x + b
+         x = (y - b) / m
+    """
+    if np.isclose(m, 0.0):
+        return 0.0
+    if m is np.nan:
+        return b
+    return (y - b) / m
+
+
+def solve4y(x: float, m: float, b: float):
+    """
+    y = m * x + b
+    """
+    if m is np.nan:
+        return b
+    return m * x + b
+
+
+def intersection(m1: float, b1: float, m2: float, b2: float, lines1: float, lines2: float):
+    # Consider y to be equal and solve for x
+    # Solve:
+    #   m1 * x + b1 = m2 * x + b2
+    x = (b2 - b1) / (m1 - m2)
+    # Use the value of x to calculate y
+    y = m1 * x + b1
+    if np.isnan(m1):
+        x = lines1
+        y = m2 * x + b2
+    if np.isnan(m2):
+        x = lines2
+        y = m1 * x +b1
+    try:
+        return int(round(x)), int(round(y))
+    except:
+        return np.nan,np.nan
+
+
+
+def hough_lines_intersection(lines: np.array, image_shape: tuple):
+    """
+    Returns the intersection points that lie on the image
+    for all combinations of the lines
+    """
+    if len(lines.shape) == 3 and \
+            lines.shape[1] == 1 and lines.shape[2] == 2:
+        lines = np.squeeze(lines)
+    lines_count = len(lines)
+    intersect_pts = []
+    for i in range(lines_count - 1):
+        for j in range(i + 1, lines_count):
+            m1, b1 = polar2cartesian(lines[i][0], lines[i][1], True)
+            m2, b2 = polar2cartesian(lines[j][0], lines[j][1], True)
+            x, y = intersection(m1, b1, m2, b2, lines[i][0],lines[j][0])
+            if point_on_image(x, y, image_shape):
+                intersect_pts.append([x, y])
+    return np.array(intersect_pts, dtype=int)
+
+
+def point_on_image(x: int, y: int, image_shape: tuple):
+    """
+    Returns true is x and y are on the image
+    """
+    return 0 <= y < image_shape[0] and 0 <= x < image_shape[1]
+
+def drawHoughLines(image, lines, output):
+    out = image.copy()
+    for line in lines:
+        rho, theta = line[0]
+        a = np.cos(theta)
+        b = np.sin(theta)
+        x0 = a * rho
+        y0 = b * rho
+        x1 = int(x0 + 10000 * (-b))
+        y1 = int(y0 + 10000 * (a))
+        x2 = int(x0 - 10000 * (-b))
+        y2 = int(y0 - 10000 * (a))
+        cv2.line(out, (x1, y1), (x2, y2), (0, 255, 0), 2)
+    cv2.imwrite(output, out)
+
+def GetLines(image,directory,number,threshold):
+    # Blur image to reduce false positive edges
+    blurred = cv2.blur(image, (9,9))
+    # RGB to gray
+    gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
+    # Threshold the image to binary
+    th, im_th = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
+    # Copy the thresholded image
+    im_floodfill_inv = cv2.bitwise_not(im_th)
+    im_base = im_floodfill_inv.copy()
+    # Mask used for flood filling
+    h, w = im_th.shape[:2]
+    mask = np.zeros((h+2, w+2), np.uint8)
+     
+    # Floodfill from point (0, 0)
+    cv2.floodFill(im_floodfill_inv, mask, (0,0), 255);
+     
+    # Invert floodfilled image
+    im_inv = cv2.bitwise_not(im_floodfill_inv)
+     
+    # Combine the two images to get the foreground
+    im_out = im_base | im_inv
+    # Export the binary image - remove the # in front of the next line if you wish to export
+    #cv2.imwrite(directory+"IMG_"+str(number)+"_fg.jpg", im_out)
+
+    # Edge detection   
+    edges = cv2.Canny(im_out, 50, 120, apertureSize=3)
+    # Export the detected edges - remove the # in front of the next line if you wish to export
+    #cv2.imwrite(directory+"IMG_"+str(number)+"_edg.jpg", edges)
+    
+    # Fit lines to detected edges
+    polar_lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)
+    
+    # Reduce all detected lines to only strongest 4
+    strong_lines = np.zeros([4,1,2])
+    n2 = 0
+    for n1 in range(0,len(polar_lines)):
+        for rho,theta in polar_lines[n1]:
+            if n1 == 0:
+                strong_lines[n2] = polar_lines[n1]
+                n2 = n2 + 1
+            else:
+                """
+                if rho < 0:
+                   rho*=-1
+                   theta-=np.pi
+                """
+                closeness_rho = np.isclose(rho,strong_lines[0:n2,0,0],atol = 300)
+                closeness_theta = np.isclose(theta,strong_lines[0:n2,0,1],atol = np.pi/18)
+                closeness = np.all([closeness_rho,closeness_theta],axis=0)
+                if not any(closeness) and n2 < 4:
+                    strong_lines[n2] = polar_lines[n1]
+                    n2 = n2 + 1
+    # Export the detected strong line fits for edge-detection - remove the # in front of the next line if you wish to export   
+    #drawHoughLines(image, strong_lines, directory+"IMG_"+str(number)+"_lines.jpg")
+    return strong_lines
