@@ -151,7 +151,7 @@ def drawHoughLines(image, lines, output):
         cv2.line(out, (x1, y1), (x2, y2), (0, 255, 0), 2)
     cv2.imwrite(output, out)
 
-def GetLines(image,directory,number,threshold):
+def GetLines(image,filepath,imagename,threshold):
     # Blur image to reduce false positive edges
     blurred = cv2.blur(image, (9,9))
     # RGB to gray
@@ -174,12 +174,12 @@ def GetLines(image,directory,number,threshold):
     # Combine the two images to get the foreground
     im_out = im_base | im_inv
     # Export the binary image - remove the # in front of the next line if you wish to export
-    #cv2.imwrite(directory+"IMG_"+str(number)+"_fg.jpg", im_out)
+    #cv2.imwrite(filepath+imagename, im_out)
 
     # Edge detection   
     edges = cv2.Canny(im_out, 50, 120, apertureSize=3)
     # Export the detected edges - remove the # in front of the next line if you wish to export
-    #cv2.imwrite(directory+"IMG_"+str(number)+"_edg.jpg", edges)
+    #cv2.imwrite(filepath+imagename, edges)
     
     # Fit lines to detected edges
     polar_lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)
@@ -205,5 +205,5 @@ def GetLines(image,directory,number,threshold):
                     strong_lines[n2] = polar_lines[n1]
                     n2 = n2 + 1
     # Export the detected strong line fits for edge-detection - remove the # in front of the next line if you wish to export   
-    #drawHoughLines(image, strong_lines, directory+"IMG_"+str(number)+"_lines.jpg")
+    #drawHoughLines(image, strong_lines, filepath+imagename)
     return strong_lines
