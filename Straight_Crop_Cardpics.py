@@ -47,9 +47,9 @@ Notice:
 ×   Both graded and raw cards work for this method.
 ×   The straightening does not warp your image, it attempts to get the best fit, but it may not be perfect.
 ×   The script may struggle with black-bordered cards, as these are difficult to differentiate from the background.
-×   The script works best with camera pictures, as these have predictable names (IMG_XXXX.jpg).
-×   Currently there is no easy method for importing phone pictures, as they generally contain complex names based on date-time,
-    it may be added in the future as a function of the directory.
+×   When you run the script you will be prompted with two selection windows:
+    1. Which images to process.
+    2. Choose the output directory.
     
 """
 #
@@ -68,6 +68,10 @@ import cv2
 import numpy as np
 import houghlines as lq
 import imutils as imu
+from tkinter import filedialog
+from tkinter import *
+import os
+import sys
 
 #
 #@=-               ooooo                                        .                   
@@ -81,10 +85,6 @@ import imutils as imu
 #@=-                         o888o                                          
 #####################################################################################################
     
-number      = 1903 # Image number in name
-number2     = 1903 # If only 1 image, same as number. If attempting multiple images of ascending image number, final image number
-directory   = "F:\\Pokemon\\Processing\\" # Directory where input image(s) is located
-out_dir     = "F:\\Pokemon\\Processing\\" # Directory where the result is saved to
 px_buffer   = 100 # Amount of pixels to buffer the sides with on the output image
 threshold   = 40 # Threshold value (scale 0-255) for creating a binary image, which is used to find the edge between background and card.
                  # Default is set to 40, a number between 30 and 50 generally gives best results.
@@ -100,14 +100,29 @@ threshold   = 40 # Threshold value (scale 0-255) for creating a binary image, wh
 #@@=-                                             888                      
 #@=-                                            o888o                       
 #####################################################################################################
-
-for picture in range(number,number2+1):
+root = Tk()
+root.withdraw()
+fileselect = filedialog.askopenfilenames(
+                                    initialdir= os.getcwd(),
+                                    title= "Please select file(s):",
+                                    filetypes= [("image files", "*.jpg *.jpeg *.png *.bmp")])
+out_dir = filedialog.askdirectory(title="Please select output folder")
+if out_dir == "":
+    print("Output folder required.")
+    sys.exit()
+out_dir += "/"
+n = -1
+for picture in fileselect:
+    n += 1
     try:
         # Import the photo, assumed photoname based on camera counting and jpg-extension
-        color = cv2.imread(directory+"IMG_"+str(picture)+".jpg", cv2.IMREAD_COLOR)
+        color = cv2.imread(picture, cv2.IMREAD_COLOR)
+        
+        # Retrieve imagename
+        imagename = picture.rsplit('/',1)[1]
         
         # Call function to get the fitted lines
-        crooked_lines = lq.GetLines(color,directory,picture,threshold)
+        crooked_lines = lq.GetLines(color,out_dir,imagename,threshold)
         
         # Finding the rotation of the card compared to straight
         av1=[]
@@ -126,7 +141,7 @@ for picture in range(number,number2+1):
         #cv2.imwrite(directory+"IMG_"+str(picture)+"_rotated.jpg", rotated)
         
         # Part 2, redo with straightened image
-        straight_lines = lq.GetLines(rotated,directory,picture,threshold)
+        straight_lines = lq.GetLines(rotated,out_dir,imagename,threshold)
         
         # Get intersect locations
         intersect_pts = lq.hough_lines_intersection(straight_lines, rotated.shape)
@@ -139,7 +154,7 @@ for picture in range(number,number2+1):
         
         # Crop and save the newly cropped and rotated image
         cropped = rotated[min_y:max_y,min_x:max_x]
-        cv2.imwrite(out_dir+"IMG_"+str(picture)+"_crop.jpg", cropped)
-        print("Succesfully exported IMG_"+str(picture))
+        cv2.imwrite(out_dir+"X_"+imagename, cropped)
+        print("Succesfully exported to "+out_dir+"X_"+imagename)
     except:
-        print("Unsuccesful with IMG_"+str(picture)+" , better luck next time!")
+        print("Unsuccesful with "+str(picture)+" , better luck next time!")
