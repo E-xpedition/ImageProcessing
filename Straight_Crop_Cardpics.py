@@ -158,3 +158,4 @@ for picture in fileselect:
         print("Succesfully exported to "+out_dir+"X_"+imagename)
     except:
         print("Unsuccesful with "+str(picture)+" , better luck next time!")
+root.destroy()
