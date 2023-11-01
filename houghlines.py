@@ -174,12 +174,12 @@ def GetLines(image,filepath,imagename,threshold):
     # Combine the two images to get the foreground
     im_out = im_base | im_inv
     # Export the binary image - remove the # in front of the next line if you wish to export
-    #cv2.imwrite(filepath+imagename, im_out)
+    #cv2.imwrite(filepath+"b_"+imagename, im_out)
 
     # Edge detection   
     edges = cv2.Canny(im_out, 50, 120, apertureSize=3)
     # Export the detected edges - remove the # in front of the next line if you wish to export
-    #cv2.imwrite(filepath+imagename, edges)
+    #cv2.imwrite(filepath+"e_"+imagename, edges)
     
     # Fit lines to detected edges
     polar_lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)
