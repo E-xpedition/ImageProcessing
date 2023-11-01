@@ -138,7 +138,7 @@ for picture in fileselect:
         elif average_rot > 1:
             rotated = imu.rotate(color, 270+average_rot*(180/np.pi))
         # Export the rotated image - remove the # in front of the next line if you wish to save
-        #cv2.imwrite(directory+"IMG_"+str(picture)+"_rotated.jpg", rotated)
+        #cv2.imwrite(out_dir+"r_"+imagename, rotated)
         
         # Part 2, redo with straightened image
         straight_lines = lq.GetLines(rotated,out_dir,imagename,threshold)
