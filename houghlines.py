@@ -32,6 +32,9 @@ This module contains all the functions required for Straight_Crop_Cardpics.py
 import numpy as np
 import cv2
 import warnings
+import houghlines as lq
+import imutils as imu
+
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
 
@@ -174,12 +177,12 @@ def GetLines(image,filepath,imagename,threshold):
     # Combine the two images to get the foreground
     im_out = im_base | im_inv
     # Export the binary image - remove the # in front of the next line if you wish to export
-    #cv2.imwrite(filepath+"b_"+imagename, im_out)
+    #cv2.imwrite(filepath+imagename, im_out)
 
     # Edge detection   
     edges = cv2.Canny(im_out, 50, 120, apertureSize=3)
     # Export the detected edges - remove the # in front of the next line if you wish to export
-    #cv2.imwrite(filepath+"e_"+imagename, edges)
+    #cv2.imwrite(filepath+imagename, edges)
     
     # Fit lines to detected edges
     polar_lines = cv2.HoughLines(edges, 1, np.pi / 180, 100)
@@ -198,12 +201,61 @@ def GetLines(image,filepath,imagename,threshold):
                    rho*=-1
                    theta-=np.pi
                 """
-                closeness_rho = np.isclose(rho,strong_lines[0:n2,0,0],atol = 300)
+                closeness_rho = np.isclose(rho,strong_lines[0:n2,0,0],atol = 500)
                 closeness_theta = np.isclose(theta,strong_lines[0:n2,0,1],atol = np.pi/18)
                 closeness = np.all([closeness_rho,closeness_theta],axis=0)
                 if not any(closeness) and n2 < 4:
                     strong_lines[n2] = polar_lines[n1]
                     n2 = n2 + 1
     # Export the detected strong line fits for edge-detection - remove the # in front of the next line if you wish to export   
-    #drawHoughLines(image, strong_lines, filepath+imagename)
+    #drawHoughLines(image, strong_lines, filepath+"p"+imagename)
     return strong_lines
+
+def final_func(threshold,fileselect,out_dir,px_buffer):
+    n = -1
+    for picture in fileselect:
+        n += 1
+        try:
+            # Import the photo, assumed photoname based on camera counting and jpg-extension
+            color = cv2.imread(picture, cv2.IMREAD_COLOR)
+            
+            # Retrieve imagename
+            imagename = picture.rsplit('/',1)[1]
+            
+            # Call function to get the fitted lines
+            crooked_lines = lq.GetLines(color,out_dir,imagename,threshold)
+            
+            # Finding the rotation of the card compared to straight
+            av1=[]
+            angle_fix = crooked_lines[crooked_lines[:,0,1].argsort()]
+            for w in range(len(angle_fix)):
+                if w > 2:
+                    av1.append(angle_fix[w,0,1])
+            average_rot = sum(av1)/len(av1)
+            
+            # Fixing the angle
+            if average_rot > 3:
+                rotated = imu.rotate(color, 180+average_rot*(180/np.pi))
+            elif average_rot > 1:
+                rotated = imu.rotate(color, 270+average_rot*(180/np.pi))
+            # Export the rotated image - remove the # in front of the next line if you wish to save
+            #cv2.imwrite(directory+"IMG_"+str(picture)+"_rotated.jpg", rotated)
+            
+            # Part 2, redo with straightened image
+            straight_lines = lq.GetLines(rotated,out_dir,imagename,threshold)
+            
+            # Get intersect locations
+            intersect_pts = lq.hough_lines_intersection(straight_lines, rotated.shape)
+            
+            # Buffer intersection points
+            min_x=min([p[0] for p in intersect_pts])-px_buffer
+            max_x=max([p[0] for p in intersect_pts])+px_buffer
+            min_y=min([p[1] for p in intersect_pts])-px_buffer
+            max_y=max([p[1] for p in intersect_pts])+px_buffer
+            
+            # Crop and save the newly cropped and rotated image
+            cropped = rotated[min_y:max_y,min_x:max_x]
+            cv2.imwrite(out_dir+"X_"+imagename, cropped)
+            print("Succesfully exported to "+out_dir+"X_"+imagename)
+        except:
+            print("Unsuccesful with "+str(picture)+" , better luck next time!")
