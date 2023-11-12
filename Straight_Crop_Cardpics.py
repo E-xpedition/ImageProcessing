@@ -86,7 +86,7 @@ import sys
 #####################################################################################################
     
 px_buffer   = 100 # Amount of pixels to buffer the sides with on the output image
-threshold   = 40 # Threshold value (scale 0-255) for creating a binary image, which is used to find the edge between background and card.
+#threshold   = 40 # Threshold value (scale 0-255) for creating a binary image, which is used to find the edge between background and card.
                  # Default is set to 40, a number between 30 and 50 generally gives best results.
 
 #
@@ -106,56 +106,27 @@ fileselect = filedialog.askopenfilenames(
                                     initialdir= os.getcwd(),
                                     title= "Please select file(s):",
                                     filetypes= [("image files", "*.jpg *.jpeg *.png *.bmp")])
+print(fileselect)
 out_dir = filedialog.askdirectory(title="Please select output folder")
 if out_dir == "":
     print("Output folder required.")
     sys.exit()
 out_dir += "/"
-n = -1
-for picture in fileselect:
-    n += 1
-    try:
-        # Import the photo, assumed photoname based on camera counting and jpg-extension
-        color = cv2.imread(picture, cv2.IMREAD_COLOR)
-        
-        # Retrieve imagename
-        imagename = picture.rsplit('/',1)[1]
-        
-        # Call function to get the fitted lines
-        crooked_lines = lq.GetLines(color,out_dir,imagename,threshold)
-        
-        # Finding the rotation of the card compared to straight
-        av1=[]
-        angle_fix = crooked_lines[crooked_lines[:,0,1].argsort()]
-        for w in range(len(angle_fix)):
-            if w > 2:
-                av1.append(angle_fix[w,0,1])
-        average_rot = sum(av1)/len(av1)
-        
-        # Fixing the angle
-        if average_rot > 3:
-            rotated = imu.rotate(color, 180+average_rot*(180/np.pi))
-        elif average_rot > 1:
-            rotated = imu.rotate(color, 270+average_rot*(180/np.pi))
-        # Export the rotated image - remove the # in front of the next line if you wish to save
-        #cv2.imwrite(out_dir+"r_"+imagename, rotated)
-        
-        # Part 2, redo with straightened image
-        straight_lines = lq.GetLines(rotated,out_dir,imagename,threshold)
-        
-        # Get intersect locations
-        intersect_pts = lq.hough_lines_intersection(straight_lines, rotated.shape)
-        
-        # Buffer intersection points
-        min_x=min([p[0] for p in intersect_pts])-px_buffer
-        max_x=max([p[0] for p in intersect_pts])+px_buffer
-        min_y=min([p[1] for p in intersect_pts])-px_buffer
-        max_y=max([p[1] for p in intersect_pts])+px_buffer
-        
-        # Crop and save the newly cropped and rotated image
-        cropped = rotated[min_y:max_y,min_x:max_x]
-        cv2.imwrite(out_dir+"X_"+imagename, cropped)
-        print("Succesfully exported to "+out_dir+"X_"+imagename)
-    except:
-        print("Unsuccesful with "+str(picture)+" , better luck next time!")
-root.destroy()
+
+root.destroy()            
+root = Tk()
+v = 40 
+def set_value():    
+    global v
+    v = w.get()  # v is set here
+
+canvas = Canvas(root, width = 700, height = 500)
+w = Scale(root,from_=0, to=255,length = 255, orient='horizontal')
+w.set(40)
+
+w.pack()
+Button(root, text='Set', command=set_value).pack()     
+Button(root, text='Confirm', command=lambda: lq.final_func(v,fileselect,out_dir, px_buffer)).pack() 
+canvas.pack()
+
+root.mainloop()
