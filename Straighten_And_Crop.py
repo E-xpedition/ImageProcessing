@@ -1,12 +1,3 @@
-import PySimpleGUI as sg
-import cv2
-import os
-import numpy as np
-import imutils as imu
-import warnings
-
-file_types = [("JPEG (*.jpg)", "*.jpg"),
-              ("All files (*.*)", "*.*")]
 """
                                                             
                              . ......                       
@@ -35,9 +26,34 @@ file_types = [("JPEG (*.jpg)", "*.jpg"),
          ----.      -:=-----=:-   --==++=++++##==           
                                         ----:               
 
+Copyright © 2023 Christoph Brühl, christoph.bruhl95@gmail.com
+License: AGPL-3.0
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+If you wish to use this software for commercial purposes, please get
+in touch via the e-mail address above.
 """
 
+import PySimpleGUI as sg
+import cv2
+import os
+import numpy as np
+import imutils as imu
+import warnings
 
+file_types = [("JPEG (*.jpg)", "*.jpg"),("All files (*.*)", "*.*")]
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -233,7 +249,7 @@ def final_func(threshold,fileselect,out_dir,px_buffer):
             av1=[]
             angle_fix = crooked_lines[crooked_lines[:,0,1].argsort()]
             for w in range(len(angle_fix)):
-                if w > 2:
+                if angle_fix[w,0,1] > 1 and angle_fix[w,0,1] < 2:
                     av1.append(angle_fix[w,0,1])
             average_rot = sum(av1)/len(av1)
             
@@ -270,35 +286,58 @@ def main():
     # Define the window layout
     layout = [
         [sg.Image(size=(500,10),filename="", key="-IMAGE-")],
-        [sg.Text("Image File"), sg.Input(size=(25, 1), key="-FILE-"), sg.FileBrowse(file_types=file_types),sg.Button("Load image"),],
+        [sg.Text("Image File"), sg.Input(size=(25, 1), key="-FILES-"), sg.FilesBrowse(file_types=file_types),sg.Button("Load image(s)"),],
         [sg.Text("Output Location"), sg.Input(size=(25, 1), key="-OUTDIR-"), sg.FolderBrowse(),],
         [sg.Text("Threshold value (ensure the entire card is white, but background is mostly black)", size=(60, 1), justification="left")],
         [sg.Slider((0, 255),40,1,orientation="h",size=(40, 15),key="-THRESH SLIDER-",)],
         [sg.Text("Buffer around output image in pixels:", size=(25, 1), justification="left"),sg.Input('100',size=(10,1), enable_events=True, key='-BUFFER-', justification="left")],
-        [sg.Button("Exit", size=(10, 1)),sg.Button("Continue", size = (10,1))],
+        [sg.Button("Exit", size=(10, 1)),sg.Button("Run", size = (10,1))],
     ]
 
     # Create the window and show it without the plot
-    window = sg.Window("Straighten And Crop", layout, location=(200, 100))
-
+    window = sg.Window("Straighten And Crop", layout, location=(200, 100), finalize=True)
+    window.bind('<Right>','-NEXT-')
+    window.bind('<Left>','-PREV-')
+    Im  = 0
     #cap = cv2.VideoCapture(0)
 
     while True:
         event, values = window.read(timeout=20)
         if event == "Exit" or event == sg.WIN_CLOSED:
             break
-        filename = values["-FILE-"]
+        filename = values["-FILES-"].split(';')[Im]
         outdir = values["-OUTDIR-"]
         if event == '-BUFFER-':
             if len(values['-BUFFER-'])>0:
                 if values['-BUFFER-'][-1] not in ('0123456789'):
                     sg.popup("Only digits allowed")
                     window['-BUFFER-'].update(values['-BUFFER-'][:-1])
-        if event == "Load image":
+        if event == "Load image(s)":
             if os.path.exists(filename):
-                thumb = cv2.imread(values["-FILE-"])
+                thumb = cv2.imread(values["-FILES-"].split(';')[0])
                 thumb = imu.resize(thumb,500)
-        
+        if event == '-NEXT-':
+            try:
+                Im += 1
+                if os.path.exists(filename):
+                    thumb = cv2.imread(values["-FILES-"].split(';')[Im])
+                    thumb = imu.resize(thumb,500)
+            except:
+                Im = 0
+                if os.path.exists(filename):
+                    thumb = cv2.imread(values["-FILES-"].split(';')[Im])
+                    thumb = imu.resize(thumb,500)
+        if event == '-PREV-':
+            try:
+                Im -= 1
+                if os.path.exists(filename):
+                    thumb = cv2.imread(values["-FILES-"].split(';')[Im])
+                    thumb = imu.resize(thumb,500)
+            except:
+                Im = len(values["-FILES-"].split(';'))-1
+                if os.path.exists(filename):
+                    thumb = cv2.imread(values["-FILES-"].split(';')[Im])
+                    thumb = imu.resize(thumb,500)
         if os.path.exists(filename) and thumb is not None:
             #frame = cv2.imread(values["-FILE-"])
             #frame = imutils.resize(frame,500)
@@ -330,8 +369,8 @@ def main():
             imgbytes = cv2.imencode(".png", frame)[1].tobytes()
             #imgbytes = cv2.imencode(".png", image)[1].tobytes()
             window["-IMAGE-"].update(data=imgbytes) 
-        if event == "Continue":
-            tempfix = [filename]
+        if event == "Run":
+            tempfix = values["-FILES-"].split(';')
             if values["-BUFFER-"] == '':
                 values["-BUFFER-"] = '0'
             if os.path.exists(outdir):
